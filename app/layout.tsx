@@ -9,7 +9,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Platipus - Open Source Speedrun Leaderboards',
   description: 'The community-driven, open source alternative to speedrun.com. Track your runs, compete with the world.',
-  generator: 'v0.app',
   icons: {
     icon: [
       {
