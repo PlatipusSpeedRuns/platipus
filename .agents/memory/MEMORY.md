@@ -1,1 +1,3 @@
 - [Clerk auth setup](clerk-auth-setup.md) — Replit-managed Clerk provisioned; GitHub/GitLab enabled via Auth pane, not code.
+- [Expo manual scaffold](expo-manual-scaffold.md) — createArtifact("expo") is blocked in iOS Replit client; must scaffold manually + use bash to create artifact.toml then verifyAndReplaceArtifactToml.
+- [Port conflicts on restart](port-conflicts.md) — after cold start, old processes may hold ports; run `fuser -k <port>/tcp` before restarting workflows, and pick unique ports per service (web=21206, api=8080, mockup=8081/8082, mobile=8083).
