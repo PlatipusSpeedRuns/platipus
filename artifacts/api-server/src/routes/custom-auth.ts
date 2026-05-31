@@ -211,4 +211,154 @@ router.get("/gitea/callback", async (req, res) => {
   }
 });
 
+// ── GitHub OAuth ─────────────────────────────────────────────────────────────
+
+router.get("/github", (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) {
+    return void res.status(503).send("GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET.");
+  }
+  const redirectUri = `${getBase(req)}/api/auth/github/callback`;
+  res.redirect(
+    `https://github.com/login/oauth/authorize` +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=read:user,user:email`,
+  );
+});
+
+router.get("/github/callback", async (req, res) => {
+  const { code } = req.query as { code?: string };
+  const base = getBase(req);
+  if (!code) return void res.redirect(`${base}/?auth_error=github_cancelled`);
+
+  try {
+    const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: `${base}/api/auth/github/callback`,
+      }),
+    });
+    const { access_token } = (await tokenRes.json()) as { access_token?: string };
+    if (!access_token) return void res.redirect(`${base}/?auth_error=github_token_failed`);
+
+    const [userRes, emailsRes] = await Promise.all([
+      fetch("https://api.github.com/user", {
+        headers: { Authorization: `Bearer ${access_token}`, Accept: "application/vnd.github+json" },
+      }),
+      fetch("https://api.github.com/user/emails", {
+        headers: { Authorization: `Bearer ${access_token}`, Accept: "application/vnd.github+json" },
+      }),
+    ]);
+    const ghUser = (await userRes.json()) as { id: number; login: string; name?: string };
+    const ghEmails = (await emailsRes.json()) as { email: string; primary: boolean; verified: boolean }[];
+    const primaryEmail = ghEmails.find((e) => e.primary && e.verified)?.email;
+
+    const externalId = `github_${ghUser.id}`;
+    const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
+    let user = existing.data[0];
+    if (!user) {
+      const params: Record<string, unknown> = {
+        externalId,
+        username: `github_${ghUser.login}`,
+        skipPasswordRequirement: true,
+        publicMetadata: { github_login: ghUser.login },
+      };
+      if (ghUser.name) {
+        const parts = ghUser.name.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (primaryEmail) params.emailAddress = [primaryEmail];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
+    }
+    const { token } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
+    res.redirect(
+      `${base}/auth/callback?ticket=${encodeURIComponent(token)}&provider=github&username=${encodeURIComponent(ghUser.login)}`,
+    );
+  } catch (err: any) {
+    console.error("GitHub callback error:", err?.message ?? err);
+    res.redirect(`${base}/?auth_error=github_error`);
+  }
+});
+
+// ── GitLab OAuth ──────────────────────────────────────────────────────────────
+
+router.get("/gitlab", (req, res) => {
+  const clientId = process.env.GITLAB_CLIENT_ID;
+  const gitlabUrl = (process.env.GITLAB_URL ?? "https://gitlab.com").replace(/\/$/, "");
+  if (!clientId) {
+    return void res.status(503).send("GitLab OAuth not configured. Set GITLAB_CLIENT_ID and GITLAB_CLIENT_SECRET.");
+  }
+  const redirectUri = `${getBase(req)}/api/auth/gitlab/callback`;
+  res.redirect(
+    `${gitlabUrl}/oauth/authorize` +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code&scope=read_user`,
+  );
+});
+
+router.get("/gitlab/callback", async (req, res) => {
+  const { code } = req.query as { code?: string };
+  const base = getBase(req);
+  const gitlabUrl = (process.env.GITLAB_URL ?? "https://gitlab.com").replace(/\/$/, "");
+  if (!code) return void res.redirect(`${base}/?auth_error=gitlab_cancelled`);
+
+  try {
+    const tokenRes = await fetch(`${gitlabUrl}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        client_id: process.env.GITLAB_CLIENT_ID,
+        client_secret: process.env.GITLAB_CLIENT_SECRET,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: `${base}/api/auth/gitlab/callback`,
+      }),
+    });
+    const { access_token } = (await tokenRes.json()) as { access_token?: string };
+    if (!access_token) return void res.redirect(`${base}/?auth_error=gitlab_token_failed`);
+
+    const userRes = await fetch(`${gitlabUrl}/api/v4/user`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const glUser = (await userRes.json()) as { id: number; username: string; name?: string; email?: string };
+
+    const externalId = `gitlab_${glUser.id}`;
+    const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
+    let user = existing.data[0];
+    if (!user) {
+      const params: Record<string, unknown> = {
+        externalId,
+        username: `gitlab_${glUser.username}`,
+        skipPasswordRequirement: true,
+        publicMetadata: { gitlab_username: glUser.username },
+      };
+      if (glUser.name) {
+        const parts = glUser.name.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (glUser.email) params.emailAddress = [glUser.email];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
+    }
+    const { token } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
+    res.redirect(
+      `${base}/auth/callback?ticket=${encodeURIComponent(token)}&provider=gitlab&username=${encodeURIComponent(glUser.username)}`,
+    );
+  } catch (err: any) {
+    console.error("GitLab callback error:", err?.message ?? err);
+    res.redirect(`${base}/?auth_error=gitlab_error`);
+  }
+});
+
 export default router;

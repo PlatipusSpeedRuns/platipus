@@ -18,7 +18,7 @@ async function apiPost(path: string, body: unknown) {
   return data;
 }
 
-type Step = "idle" | "radicle-did" | "radicle-challenge" | "radicle-verify";
+type Step = "idle" | "radicle";
 
 export function CustomAuthButtons() {
   const [step, setStep] = useState<Step>("idle");
@@ -26,8 +26,29 @@ export function CustomAuthButtons() {
   if (step === "idle") {
     return (
       <div className="w-full space-y-2">
-        <GiteaButton />
-        <RadicleButton onClick={() => setStep("radicle-did")} />
+        <OAuthPopupButton
+          provider="github"
+          label="Continue with GitHub"
+          icon={<GitHubIcon />}
+        />
+        <OAuthPopupButton
+          provider="gitlab"
+          label="Continue with GitLab"
+          icon={<GitLabIcon />}
+        />
+        <OAuthPopupButton
+          provider="gitea"
+          label="Continue with Gitea"
+          icon={<GiteaIcon />}
+        />
+        <button
+          onClick={() => setStep("radicle")}
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-[0.625rem] border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+        >
+          <RadicleIcon />
+          Continue with Radicle DID
+        </button>
         <div className="flex items-center gap-3 py-1">
           <div className="h-px flex-1 bg-border" />
           <span className="text-xs text-muted-foreground">or</span>
@@ -37,15 +58,18 @@ export function CustomAuthButtons() {
     );
   }
 
-  return (
-    <RadicleFlow
-      initialStep={step === "radicle-did" ? "did" : "challenge"}
-      onBack={() => setStep("idle")}
-    />
-  );
+  return <RadicleFlow onBack={() => setStep("idle")} />;
 }
 
-function GiteaButton() {
+function OAuthPopupButton({
+  provider,
+  label,
+  icon,
+}: {
+  provider: string;
+  label: string;
+  icon: React.ReactNode;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -53,13 +77,13 @@ function GiteaButton() {
     setError("");
     setPending(true);
     const popup = window.open(
-      `${BASE_URL}/api/auth/gitea`,
-      "gitea-auth",
+      `${BASE_URL}/api/auth/${provider}`,
+      `${provider}-auth`,
       "width=600,height=700,left=200,top=100",
     );
 
     if (!popup) {
-      setError("Popup blocked. Please allow pop-ups for this site.");
+      setError("Pop-up blocked — allow pop-ups for this site and try again.");
       setPending(false);
       return;
     }
@@ -68,6 +92,7 @@ function GiteaButton() {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type !== "platipus:auth:complete") return;
       window.removeEventListener("message", onMessage);
+      clearInterval(poll);
       setPending(false);
       window.location.href = `${BASE_URL}/dashboard`;
     }
@@ -83,35 +108,22 @@ function GiteaButton() {
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       <button
         onClick={handleClick}
         disabled={pending}
         type="button"
         className="flex w-full items-center justify-center gap-2 rounded-[0.625rem] border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
       >
-        <GiteaIcon />
-        {pending ? "Waiting for Gitea…" : "Continue with Gitea"}
+        {icon}
+        {pending ? `Waiting for ${provider}…` : label}
       </button>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
 
-function RadicleButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      type="button"
-      className="flex w-full items-center justify-center gap-2 rounded-[0.625rem] border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
-    >
-      <RadicleIcon />
-      Continue with Radicle DID
-    </button>
-  );
-}
-
-function RadicleFlow({ onBack }: { initialStep: "did" | "challenge"; onBack: () => void }) {
+function RadicleFlow({ onBack }: { onBack: () => void }) {
   const [did, setDid] = useState("");
   const [nonce, setNonce] = useState("");
   const [sig, setSig] = useState("");
@@ -158,7 +170,12 @@ function RadicleFlow({ onBack }: { initialStep: "did" | "challenge"; onBack: () 
   return (
     <div className="w-full rounded-[0.625rem] border border-border bg-background p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors" type="button" aria-label="Back">
+        <button
+          onClick={onBack}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          type="button"
+          aria-label="Back"
+        >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
@@ -195,16 +212,14 @@ function RadicleFlow({ onBack }: { initialStep: "did" | "challenge"; onBack: () 
       {(phase === "challenge" || phase === "sig") && (
         <div className="space-y-3">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-foreground">
-              Step 1 — Run this in your terminal:
-            </p>
+            <p className="text-xs font-medium text-foreground">Step 1 — Run this in your terminal:</p>
             <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
               <code className="flex-1 break-all text-xs text-foreground">{command}</code>
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(command)}
                 className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                title="Copy command"
+                title="Copy"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -214,13 +229,14 @@ function RadicleFlow({ onBack }: { initialStep: "did" | "challenge"; onBack: () 
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-foreground">
-              Step 2 — Paste the output here:
-            </Label>
+            <Label className="text-xs font-medium text-foreground">Step 2 — Paste the output:</Label>
             <Input
               placeholder="Hex or base64 signature…"
               value={sig}
-              onChange={(e) => { setSig(e.target.value); setPhase("sig"); }}
+              onChange={(e) => {
+                setSig(e.target.value);
+                setPhase("sig");
+              }}
               className="font-mono text-sm"
             />
           </div>
@@ -229,22 +245,40 @@ function RadicleFlow({ onBack }: { initialStep: "did" | "challenge"; onBack: () 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setPhase("did"); setNonce(""); setSig(""); setError(""); }}
+              onClick={() => {
+                setPhase("did");
+                setNonce("");
+                setSig("");
+                setError("");
+              }}
             >
               Back
             </Button>
-            <Button
-              onClick={verify}
-              disabled={loading || !sig}
-              size="sm"
-              className="flex-1"
-            >
+            <Button onClick={verify} disabled={loading || !sig} size="sm" className="flex-1">
               {loading ? "Verifying…" : "Verify & sign in"}
             </Button>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
+function GitHubIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
+
+function GitLabIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+    </svg>
   );
 }
 
