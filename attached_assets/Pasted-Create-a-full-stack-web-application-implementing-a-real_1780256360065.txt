@@ -1,0 +1,29 @@
+Create a full-stack web application implementing a real-time Chat Interface that embeds a specialized dual-authentication widget directly into the chat stream.
+
+### Architecture Overview:
+- Frontend: Responsive web view designed to look like a chat app (Tailwind CSS + vanilla JavaScript).
+- Backend: Node.js (Express) or Python (FastAPI/Flask) to handle chat routing and authentication.
+
+### Core Feature Requirements:
+
+1. **The In-Chat Embed UI Layout:**
+   - The landing screen should look like an active, modern AI or support chat interface.
+   - The first message in the chat stream is a system message prompting the user to authenticate before continuing.
+   - Embedded directly inside that chat bubble/card is an interactive widget containing two tabs: "Authenticate via Radicle" and "Connect Gitea".
+
+2. **Radicle Authentication Workflow (Inside Chat Card):**
+   - User inputs their Radicle DID directly into the chat bubble input box.
+   - The backend returns a challenge nonce.
+   - The chat bubble updates dynamically to display a copyable terminal command: `echo -n "[NONCE]" | rad auth --stdin`
+   - User submits their cryptographic signature string right inside the card.
+   - The backend validates the signature, unlocks the session, and triggers a chat alert: "Decentralized identity verified!"
+
+3. **Gitea OAuth2 Workflow (Inside Chat Card):**
+   - Clicking "Connect Gitea" opens a pop-up window or transparently handles the authorization redirect loop to the designated Gitea server.
+   - Upon successful callback handling (`/auth/gitea/callback`), the widget uses `window.opener.postMessage` or a shared state to close the pop-up and flag the chat interface as "Authenticated as Gitea User: [Username]".
+
+4. **Post-Authentication Chat Unlock:**
+   - Once either Radicle OR Gitea auth returns a valid session token, the authentication card dynamically disappears or changes to a green "Successfully Verified" status badge.
+   - The chat bottom input bar (which was previously locked/grayed out) is instantly unlocked, allowing the user to start typing and sending regular chat messages to the server.
+
+Please provide all operational code files, frontend scripts tracking the chat status changes, and a clean `.env` template for the Gitea OAuth client keys.
