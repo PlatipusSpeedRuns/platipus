@@ -1,0 +1,1 @@
+- [Clerk auth setup](clerk-auth-setup.md) — Replit-managed Clerk provisioned; GitHub/GitLab enabled via Auth pane, not code.

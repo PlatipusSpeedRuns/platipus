@@ -1,9 +1,56 @@
-
-
-import { Link } from "wouter"
+import { Link, useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
-import { Timer, Github, Menu, X } from "lucide-react"
+import { Timer, Github, Menu, X, LogOut, User } from "lucide-react"
 import { useState } from "react"
+import { Show, useClerk, useUser } from "@clerk/react"
+
+function UserMenu() {
+  const { user } = useUser()
+  const { signOut } = useClerk()
+  const [open, setOpen] = useState(false)
+  const [, setLocation] = useLocation()
+
+  if (!user) return null
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        {user.imageUrl ? (
+          <img src={user.imageUrl} alt={user.firstName ?? "User"} className="h-9 w-9 rounded-full object-cover" />
+        ) : (
+          <User className="h-4 w-4" />
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 z-50 min-w-[180px] rounded-lg border border-border bg-card p-1 shadow-md">
+          <div className="px-3 py-2 border-b border-border mb-1">
+            <p className="text-sm font-medium text-foreground truncate">
+              {user.firstName && user.lastName
+                ? `${user.firstName} ${user.lastName}`
+                : user.username ?? user.emailAddresses[0]?.emailAddress ?? "User"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user.emailAddresses[0]?.emailAddress}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setOpen(false)
+              signOut({ redirectUrl: "/" })
+            }}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -41,12 +88,17 @@ export function Header() {
               GitHub
             </a>
           </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/login">Log in</Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/signup">Sign up</Link>
-          </Button>
+          <Show when="signed-out">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/sign-in">Log in</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href="/sign-up">Sign up</Link>
+            </Button>
+          </Show>
+          <Show when="signed-in">
+            <UserMenu />
+          </Show>
         </div>
 
         {/* Mobile menu button */}
@@ -75,12 +127,17 @@ export function Header() {
               Docs
             </Link>
             <div className="flex flex-col gap-2 pt-2">
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href="/login">Log in</Link>
-              </Button>
-              <Button size="sm" asChild className="w-full">
-                <Link href="/signup">Sign up</Link>
-              </Button>
+              <Show when="signed-out">
+                <Button variant="outline" size="sm" asChild className="w-full">
+                  <Link href="/sign-in">Log in</Link>
+                </Button>
+                <Button size="sm" asChild className="w-full">
+                  <Link href="/sign-up">Sign up</Link>
+                </Button>
+              </Show>
+              <Show when="signed-in">
+                <UserMenu />
+              </Show>
             </div>
           </nav>
         </div>
