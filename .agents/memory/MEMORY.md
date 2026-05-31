@@ -1,5 +1,7 @@
-- [Clerk auth setup](clerk-auth-setup.md) — Replit-managed Clerk provisioned; GitHub/GitLab enabled via Auth pane, not code; Google enabled by default in dev.
+- [Clerk auth setup](clerk-auth-setup.md) — Replit-managed Clerk; GitHub/GitLab via Auth pane; Google enabled by default in dev; Gitea/Radicle via custom /api/auth/* routes.
 - [Expo manual scaffold](expo-manual-scaffold.md) — createArtifact("expo") is blocked in iOS Replit client; must scaffold manually + use bash to create artifact.toml then verifyAndReplaceArtifactToml.
 - [Port conflicts on restart](port-conflicts.md) — after cold start, old processes may hold ports; run `fuser -k <port>/tcp` before restarting workflows, and pick unique ports per service (web=21206, api=8080, mockup=8081/8082, mobile=8083).
 - [Streaming admin key](streaming-admin-key.md) — default streaming approval code is `platipus-admin-2024`; override with ADMIN_KEY env var on the API server.
 - [FormSubmit email](formsubmit-email.md) — Add Game and Submit Run forms use formsubmit.co/ajax/caiiummog@gmail.com; first submission triggers a one-time verification email to that address.
+- [API server build — noble/hashes](noble-hashes-build.md) — @noble/hashes subpath imports break esbuild bundling; use Node's built-in crypto.createHash for sha512. Also: @noble/ed25519 v2 freezes ed.etc, cannot assign sha512Sync; use crypto.verify() with DER-encoded SPKI instead.
+- [Radicle DID verification](radicle-did-verification.md) — Ed25519 pubkey from did:key:z<base58btc>: strip "did:key:z", base58-decode, skip [0xed,0x01] multicodec prefix, prepend DER SPKI header 302a300506032b6570032100, then Node crypto.verify(null, msg, key, sig).
