@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { Trophy, Users } from "lucide-react"
+import { Trophy } from "lucide-react"
 import { Link } from "wouter"
 
 export function LeaderboardPreview() {
@@ -16,7 +16,7 @@ export function LeaderboardPreview() {
             </p>
           </div>
           <Button variant="outline" asChild>
-            <Link href="/runs">
+            <Link href="/leaderboards">
               View all runs
             </Link>
           </Button>

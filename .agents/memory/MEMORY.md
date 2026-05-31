@@ -1,3 +1,5 @@
-- [Clerk auth setup](clerk-auth-setup.md) — Replit-managed Clerk provisioned; GitHub/GitLab enabled via Auth pane, not code.
+- [Clerk auth setup](clerk-auth-setup.md) — Replit-managed Clerk provisioned; GitHub/GitLab enabled via Auth pane, not code; Google enabled by default in dev.
 - [Expo manual scaffold](expo-manual-scaffold.md) — createArtifact("expo") is blocked in iOS Replit client; must scaffold manually + use bash to create artifact.toml then verifyAndReplaceArtifactToml.
 - [Port conflicts on restart](port-conflicts.md) — after cold start, old processes may hold ports; run `fuser -k <port>/tcp` before restarting workflows, and pick unique ports per service (web=21206, api=8080, mockup=8081/8082, mobile=8083).
+- [Streaming admin key](streaming-admin-key.md) — default streaming approval code is `platipus-admin-2024`; override with ADMIN_KEY env var on the API server.
+- [FormSubmit email](formsubmit-email.md) — Add Game and Submit Run forms use formsubmit.co/ajax/caiiummog@gmail.com; first submission triggers a one-time verification email to that address.

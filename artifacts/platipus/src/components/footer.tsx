@@ -5,25 +5,25 @@ const footerLinks = {
   Platform: [
     { label: "Games", href: "/games" },
     { label: "Leaderboards", href: "/leaderboards" },
-    { label: "Runners", href: "/runners" },
     { label: "Submit Run", href: "/submit" },
+    { label: "Dashboard", href: "/dashboard" },
   ],
   Community: [
-    { label: "Discord", href: "/discord" },
-    { label: "Forums", href: "/forums" },
-    { label: "Events", href: "/events" },
-    { label: "Blog", href: "/blog" },
+    { label: "Community", href: "/community" },
+    { label: "Discord", href: "https://discord.gg/platipus", external: true },
+    { label: "Events", href: "/community" },
+    { label: "GitHub", href: "https://github.com/platipus-speedruns/platipus", external: true },
   ],
   Developers: [
-    { label: "API Docs", href: "/docs/api" },
-    { label: "GitHub", href: "https://github.com/platipus-speedruns/platipus" },
-    { label: "Contribute", href: "/contribute" },
-    { label: "Self-Host", href: "/docs/self-host" },
+    { label: "Docs", href: "/docs" },
+    { label: "API Docs", href: "/docs" },
+    { label: "Contribute", href: "https://github.com/platipus-speedruns/platipus", external: true },
+    { label: "Self-Host", href: "/docs" },
   ],
   Legal: [
-    { label: "Privacy", href: "/privacy" },
-    { label: "Terms", href: "/terms" },
-    { label: "Guidelines", href: "/guidelines" },
+    { label: "Privacy", href: "/docs" },
+    { label: "Terms", href: "/docs" },
+    { label: "Guidelines", href: "/docs" },
   ],
 }
 
@@ -68,30 +68,27 @@ export function Footer() {
             <div key={category}>
               <h3 className="text-sm font-semibold text-foreground">{category}</h3>
               <ul className="mt-4 space-y-3">
-                {links.map((link) => {
-                  const isExternal = link.href.startsWith("http")
-                  return (
-                    <li key={link.label}>
-                      {isExternal ? (
-                        <a
-                          href={link.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          {link.label}
-                        </a>
-                      ) : (
-                        <Link
-                          href={link.href}
-                          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          {link.label}
-                        </Link>
-                      )}
-                    </li>
-                  )
-                })}
+                {links.map((link) => (
+                  <li key={link.label}>
+                    {"external" in link && link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {link.label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
               </ul>
             </div>
           ))}

@@ -8,6 +8,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import Games from "@/pages/games";
+import Leaderboards from "@/pages/leaderboards";
+import AddGame from "@/pages/add-game";
+import Dashboard from "@/pages/dashboard";
+import Community from "@/pages/community";
+import Docs from "@/pages/docs";
+import SubmitRun from "@/pages/submit-run";
+import WatchStream from "@/pages/watch";
 
 const queryClient = new QueryClient();
 
@@ -170,6 +178,15 @@ function ClerkProviderWithRoutes() {
         <TooltipProvider>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/games" component={Games} />
+            <Route path="/games/new" component={AddGame} />
+            <Route path="/leaderboards" component={Leaderboards} />
+            <Route path="/submit" component={SubmitRun} />
+            <Route path="/dashboard" component={Dashboard} />
+            <Route path="/community" component={Community} />
+            <Route path="/docs" component={Docs} />
+            <Route path="/docs/:slug" component={Docs} />
+            <Route path="/watch/:streamKey" component={WatchStream} />
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             <Route component={NotFound} />

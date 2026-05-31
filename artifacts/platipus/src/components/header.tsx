@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
-import { Timer, Github, Menu, X, LogOut, User } from "lucide-react"
+import { Timer, Github, Menu, X, LogOut, User, LayoutDashboard } from "lucide-react"
 import { useState } from "react"
 import { Show, useClerk, useUser } from "@clerk/react"
 
@@ -25,7 +25,7 @@ function UserMenu() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-11 z-50 min-w-[180px] rounded-lg border border-border bg-card p-1 shadow-md">
+        <div className="absolute right-0 top-11 z-50 min-w-[200px] rounded-lg border border-border bg-card p-1 shadow-md">
           <div className="px-3 py-2 border-b border-border mb-1">
             <p className="text-sm font-medium text-foreground truncate">
               {user.firstName && user.lastName
@@ -36,6 +36,14 @@ function UserMenu() {
               {user.emailAddresses[0]?.emailAddress}
             </p>
           </div>
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Link>
           <button
             onClick={() => {
               setOpen(false)
@@ -54,6 +62,12 @@ function UserMenu() {
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [location] = useLocation()
+
+  function navClass(href: string) {
+    const active = location === href || location.startsWith(href + "/")
+    return `text-sm font-medium transition-colors hover:text-foreground ${active ? "text-foreground" : "text-muted-foreground"}`
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
@@ -67,16 +81,16 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-8 md:flex">
-          <Link href="/games" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link href="/games" className={navClass("/games")}>
             Games
           </Link>
-          <Link href="/leaderboards" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link href="/leaderboards" className={navClass("/leaderboards")}>
             Leaderboards
           </Link>
-          <Link href="/community" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link href="/community" className={navClass("/community")}>
             Community
           </Link>
-          <Link href="/docs" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link href="/docs" className={navClass("/docs")}>
             Docs
           </Link>
         </nav>
@@ -97,6 +111,12 @@ export function Header() {
             </Button>
           </Show>
           <Show when="signed-in">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Dashboard
+              </Link>
+            </Button>
             <UserMenu />
           </Show>
         </div>
@@ -114,28 +134,34 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="border-t border-border bg-card px-4 py-4 md:hidden">
           <nav className="flex flex-col gap-4">
-            <Link href="/games" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <Link href="/games" className={navClass("/games")} onClick={() => setMobileMenuOpen(false)}>
               Games
             </Link>
-            <Link href="/leaderboards" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <Link href="/leaderboards" className={navClass("/leaderboards")} onClick={() => setMobileMenuOpen(false)}>
               Leaderboards
             </Link>
-            <Link href="/community" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <Link href="/community" className={navClass("/community")} onClick={() => setMobileMenuOpen(false)}>
               Community
             </Link>
-            <Link href="/docs" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <Link href="/docs" className={navClass("/docs")} onClick={() => setMobileMenuOpen(false)}>
               Docs
             </Link>
-            <div className="flex flex-col gap-2 pt-2">
+            <div className="flex flex-col gap-2 pt-2 border-t border-border">
               <Show when="signed-out">
                 <Button variant="outline" size="sm" asChild className="w-full">
-                  <Link href="/sign-in">Log in</Link>
+                  <Link href="/sign-in" onClick={() => setMobileMenuOpen(false)}>Log in</Link>
                 </Button>
                 <Button size="sm" asChild className="w-full">
-                  <Link href="/sign-up">Sign up</Link>
+                  <Link href="/sign-up" onClick={() => setMobileMenuOpen(false)}>Sign up</Link>
                 </Button>
               </Show>
               <Show when="signed-in">
+                <Button variant="outline" size="sm" asChild className="w-full">
+                  <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </Link>
+                </Button>
                 <UserMenu />
               </Show>
             </div>
