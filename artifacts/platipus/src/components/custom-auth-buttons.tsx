@@ -37,6 +37,11 @@ export function CustomAuthButtons() {
           icon={<GitLabIcon />}
         />
         <OAuthPopupButton
+          provider="codeberg"
+          label="Continue with Codeberg"
+          icon={<CodebergIcon />}
+        />
+        <OAuthPopupButton
           provider="gitea"
           label="Continue with Gitea"
           icon={<GiteaIcon />}
@@ -278,6 +283,14 @@ function GitLabIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
       <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+    </svg>
+  );
+}
+
+function CodebergIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 12 12 12 12 0 0 0 12-12 12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm0 1.5A10.5 10.5 0 0 1 22.5 12.49a10.5 10.5 0 0 1-10.5 10.5A10.5 10.5 0 0 1 1.5 12.49 10.5 10.5 0 0 1 11.955 1.99zM12 5.5a.75.75 0 0 0-.75.75v5.44L7.72 15.22a.75.75 0 0 0 0 1.06.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0 .22-.53V6.25A.75.75 0 0 0 12 5.5z"/>
     </svg>
   );
 }

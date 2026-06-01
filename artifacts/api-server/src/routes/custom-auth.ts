@@ -211,6 +211,76 @@ router.get("/gitea/callback", async (req, res) => {
   }
 });
 
+// ── Codeberg OAuth (Gitea instance at codeberg.org) ──────────────────────────
+
+const CODEBERG_URL = "https://codeberg.org";
+
+router.get("/codeberg", (req, res) => {
+  const clientId = process.env.CODEBERG_CLIENT_ID;
+  if (!clientId) {
+    return void res.status(503).send("Codeberg OAuth not configured. Set CODEBERG_CLIENT_ID and CODEBERG_CLIENT_SECRET.");
+  }
+  const redirectUri = `${getBase(req)}/api/auth/codeberg/callback`;
+  res.redirect(
+    `${CODEBERG_URL}/login/oauth/authorize` +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=code`,
+  );
+});
+
+router.get("/codeberg/callback", async (req, res) => {
+  const { code } = req.query as { code?: string };
+  const base = getBase(req);
+  if (!code) return void res.redirect(`${base}/?auth_error=codeberg_cancelled`);
+
+  const clientId = process.env.CODEBERG_CLIENT_ID ?? "";
+  const clientSecret = process.env.CODEBERG_CLIENT_SECRET ?? "";
+  const redirectUri = `${base}/api/auth/codeberg/callback`;
+
+  try {
+    const tokenRes = await fetch(`${CODEBERG_URL}/login/oauth/access_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, redirect_uri: redirectUri, grant_type: "authorization_code" }),
+    });
+    const { access_token } = (await tokenRes.json()) as { access_token?: string };
+    if (!access_token) return void res.redirect(`${base}/?auth_error=codeberg_token_failed`);
+
+    const userRes = await fetch(`${CODEBERG_URL}/api/v1/user`, {
+      headers: { Authorization: `token ${access_token}` },
+    });
+    const cbUser = (await userRes.json()) as { id: number; login: string; email?: string; full_name?: string };
+    if (!cbUser.login) return void res.redirect(`${base}/?auth_error=codeberg_user_failed`);
+
+    const externalId = `codeberg_${cbUser.id}`;
+    const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
+    let user = existing.data[0];
+    if (!user) {
+      const params: Record<string, unknown> = {
+        externalId,
+        username: `codeberg_${cbUser.login}`,
+        skipPasswordRequirement: true,
+        publicMetadata: { codeberg_login: cbUser.login },
+      };
+      if (cbUser.full_name) {
+        const parts = cbUser.full_name.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (cbUser.email) params.emailAddress = [cbUser.email];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
+    }
+    const { token } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
+    res.redirect(`${base}/auth/callback?ticket=${encodeURIComponent(token)}&provider=codeberg&username=${encodeURIComponent(cbUser.login)}`);
+  } catch (err: any) {
+    console.error("Codeberg callback error:", err?.message ?? err);
+    res.redirect(`${base}/?auth_error=codeberg_error`);
+  }
+});
+
 // ── GitHub OAuth ─────────────────────────────────────────────────────────────
 
 router.get("/github", (req, res) => {
