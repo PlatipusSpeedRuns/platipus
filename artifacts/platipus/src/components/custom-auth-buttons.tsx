@@ -18,7 +18,7 @@ async function apiPost(path: string, body: unknown) {
   return data;
 }
 
-type Step = "idle" | "radicle" | "gitea" | "forgejo";
+type Step = "idle" | "radicle" | "forgejo" | "sourcehut";
 
 export function CustomAuthButtons() {
   const [step, setStep] = useState<Step>("idle");
@@ -27,19 +27,9 @@ export function CustomAuthButtons() {
     return (
       <div className="w-full space-y-2">
         <OAuthPopupButton
-          provider="github"
-          label="Continue with GitHub"
-          icon={<GitHubIcon />}
-        />
-        <OAuthPopupButton
-          provider="gitlab"
-          label="Continue with GitLab"
-          icon={<GitLabIcon />}
-        />
-        <OAuthPopupButton
-          provider="codeberg"
-          label="Continue with Codeberg"
-          icon={<CodebergIcon />}
+          provider="youtube"
+          label="Continue with YouTube"
+          icon={<YouTubeIcon />}
         />
         <button
           onClick={() => setStep("forgejo")}
@@ -50,12 +40,12 @@ export function CustomAuthButtons() {
           Continue with Forgejo
         </button>
         <button
-          onClick={() => setStep("gitea")}
+          onClick={() => setStep("sourcehut")}
           type="button"
           className="flex w-full items-center justify-center gap-2 rounded-[0.625rem] border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
         >
-          <GiteaIcon />
-          Continue with Gitea
+          <SourcehutIcon />
+          Continue with Sourcehut
         </button>
         <button
           onClick={() => setStep("radicle")}
@@ -75,7 +65,7 @@ export function CustomAuthButtons() {
   }
 
   if (step === "forgejo") return <ForgejoFlow onBack={() => setStep("idle")} />;
-  if (step === "gitea") return <GiteaFlow onBack={() => setStep("idle")} />;
+  if (step === "sourcehut") return <SourcehutFlow onBack={() => setStep("idle")} />;
   return <RadicleFlow onBack={() => setStep("idle")} />;
 }
 
@@ -228,8 +218,7 @@ function ForgejoFlow({ onBack }: { onBack: () => void }) {
   );
 }
 
-function GiteaFlow({ onBack }: { onBack: () => void }) {
-  const [giteaUrl, setGiteaUrl] = useState("https://");
+function SourcehutFlow({ onBack }: { onBack: () => void }) {
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -241,7 +230,7 @@ function GiteaFlow({ onBack }: { onBack: () => void }) {
     setError("");
     setLoading(true);
     try {
-      const data = await apiPost("gitea/token", { giteaUrl: giteaUrl.trim(), token: token.trim() });
+      const data = await apiPost("sourcehut/token", { token: token.trim() });
       const result = await signIn!.create({ strategy: "ticket", ticket: data.ticket });
       if (result.status === "complete") {
         await setActive!({ session: result.createdSessionId });
@@ -254,10 +243,6 @@ function GiteaFlow({ onBack }: { onBack: () => void }) {
     }
   }
 
-  const tokenUrl = giteaUrl.startsWith("https://") && giteaUrl.length > 8
-    ? `${giteaUrl.replace(/\/$/, "")}/-/user/settings/applications`
-    : null;
-
   return (
     <div className="w-full rounded-[0.625rem] border border-border bg-background p-4 space-y-4">
       <div className="flex items-center gap-2">
@@ -267,29 +252,22 @@ function GiteaFlow({ onBack }: { onBack: () => void }) {
           </svg>
         </button>
         <div className="flex items-center gap-1.5">
-          <GiteaIcon />
-          <span className="text-sm font-semibold text-foreground">Sign in with Gitea</span>
+          <SourcehutIcon />
+          <span className="text-sm font-semibold text-foreground">Sign in with Sourcehut</span>
         </div>
       </div>
-
       <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Your Gitea instance URL</Label>
-          <Input
-            placeholder="https://gitea.example.com"
-            value={giteaUrl}
-            onChange={(e) => setGiteaUrl(e.target.value)}
-            className="font-mono text-sm"
-          />
-        </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label className="text-xs text-muted-foreground">Personal access token</Label>
-            {tokenUrl && (
-              <a href={tokenUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
-                Generate token →
-              </a>
-            )}
+            <a
+              href="https://meta.sr.ht/oauth2/personal-token"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              Generate token →
+            </a>
           </div>
           <Input
             type="password"
@@ -299,13 +277,13 @@ function GiteaFlow({ onBack }: { onBack: () => void }) {
             className="font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            In your Gitea: Settings → Applications → Generate Token (any scope works)
+            Go to meta.sr.ht → OAuth2 → Personal Access Tokens → New token (no special grants needed)
           </p>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Button
           onClick={handleSubmit}
-          disabled={loading || !token || !giteaUrl.startsWith("http")}
+          disabled={loading || !token}
           size="sm"
           className="w-full"
         >
@@ -459,18 +437,10 @@ function RadicleFlow({ onBack }: { onBack: () => void }) {
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
-function GitHubIcon() {
+function YouTubeIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-    </svg>
-  );
-}
-
-function GitLabIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 01-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 014.82 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0118.6 2a.43.43 0 01.58 0 .42.42 0 01.11.18l2.44 7.51L23 13.45a.84.84 0 01-.35.94z" />
+      <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
     </svg>
   );
 }
@@ -478,23 +448,16 @@ function GitLabIcon() {
 function ForgejoIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
     </svg>
   );
 }
 
-function CodebergIcon() {
+function SourcehutIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M11.955.49A12 12 0 0 0 0 12.49a12 12 0 0 0 12 12 12 12 0 0 0 12-12 12 12 0 0 0-12-12 12 12 0 0 0-.045 0zm0 1.5A10.5 10.5 0 0 1 22.5 12.49a10.5 10.5 0 0 1-10.5 10.5A10.5 10.5 0 0 1 1.5 12.49 10.5 10.5 0 0 1 11.955 1.99zM12 5.5a.75.75 0 0 0-.75.75v5.44L7.72 15.22a.75.75 0 0 0 0 1.06.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 0 0 .22-.53V6.25A.75.75 0 0 0 12 5.5z"/>
-    </svg>
-  );
-}
-
-function GiteaIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="4" />
     </svg>
   );
 }
