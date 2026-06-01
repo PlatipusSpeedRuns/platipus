@@ -18,7 +18,7 @@ async function apiPost(path: string, body: unknown) {
   return data;
 }
 
-type Step = "idle" | "radicle";
+type Step = "idle" | "radicle" | "gitea";
 
 export function CustomAuthButtons() {
   const [step, setStep] = useState<Step>("idle");
@@ -41,11 +41,14 @@ export function CustomAuthButtons() {
           label="Continue with Codeberg"
           icon={<CodebergIcon />}
         />
-        <OAuthPopupButton
-          provider="gitea"
-          label="Continue with Gitea"
-          icon={<GiteaIcon />}
-        />
+        <button
+          onClick={() => setStep("gitea")}
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-[0.625rem] border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+        >
+          <GiteaIcon />
+          Continue with Gitea
+        </button>
         <button
           onClick={() => setStep("radicle")}
           type="button"
@@ -63,6 +66,7 @@ export function CustomAuthButtons() {
     );
   }
 
+  if (step === "gitea") return <GiteaFlow onBack={() => setStep("idle")} />;
   return <RadicleFlow onBack={() => setStep("idle")} />;
 }
 
@@ -124,6 +128,94 @@ function OAuthPopupButton({
         {pending ? `Waiting for ${provider}…` : label}
       </button>
       {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function GiteaFlow({ onBack }: { onBack: () => void }) {
+  const [giteaUrl, setGiteaUrl] = useState("https://");
+  const [token, setToken] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { signIn, setActive, isLoaded } = useSignIn();
+  const [, navigate] = useLocation();
+
+  async function handleSubmit() {
+    if (!isLoaded) return;
+    setError("");
+    setLoading(true);
+    try {
+      const data = await apiPost("gitea/token", { giteaUrl: giteaUrl.trim(), token: token.trim() });
+      const result = await signIn!.create({ strategy: "ticket", ticket: data.ticket });
+      if (result.status === "complete") {
+        await setActive!({ session: result.createdSessionId });
+        navigate("/dashboard");
+      }
+    } catch (e: any) {
+      setError(e.message ?? "Verification failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const tokenUrl = giteaUrl.startsWith("https://") && giteaUrl.length > 8
+    ? `${giteaUrl.replace(/\/$/, "")}/-/user/settings/applications`
+    : null;
+
+  return (
+    <div className="w-full rounded-[0.625rem] border border-border bg-background p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors" type="button" aria-label="Back">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-1.5">
+          <GiteaIcon />
+          <span className="text-sm font-semibold text-foreground">Sign in with Gitea</span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Your Gitea instance URL</Label>
+          <Input
+            placeholder="https://gitea.example.com"
+            value={giteaUrl}
+            onChange={(e) => setGiteaUrl(e.target.value)}
+            className="font-mono text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Personal access token</Label>
+            {tokenUrl && (
+              <a href={tokenUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                Generate token →
+              </a>
+            )}
+          </div>
+          <Input
+            type="password"
+            placeholder="Paste your token…"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            className="font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            In your Gitea: Settings → Applications → Generate Token (any scope works)
+          </p>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <Button
+          onClick={handleSubmit}
+          disabled={loading || !token || !giteaUrl.startsWith("http")}
+          size="sm"
+          className="w-full"
+        >
+          {loading ? "Verifying…" : "Sign in"}
+        </Button>
+      </div>
     </div>
   );
 }

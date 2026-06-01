@@ -116,7 +116,54 @@ router.post("/radicle/verify", async (req, res) => {
   }
 });
 
-// GET /api/auth/gitea  — start OAuth flow
+// POST /api/auth/gitea/token  — verify a personal access token against any Gitea instance
+router.post("/gitea/token", async (req, res) => {
+  const { giteaUrl: rawUrl, token } = req.body as { giteaUrl?: string; token?: string };
+  if (!rawUrl || !token) {
+    return void res.status(400).json({ error: "giteaUrl and token are required" });
+  }
+  const giteaUrl = rawUrl.replace(/\/$/, "");
+
+  try {
+    const userRes = await fetch(`${giteaUrl}/api/v1/user`, {
+      headers: { Authorization: `token ${token}` },
+    });
+    if (!userRes.ok) {
+      return void res.status(401).json({ error: "Invalid token or unreachable Gitea instance" });
+    }
+    const giteaUser = (await userRes.json()) as { id: number; login: string; email?: string; full_name?: string };
+    if (!giteaUser.login) return void res.status(401).json({ error: "Could not read user from Gitea" });
+
+    const host = new URL(giteaUrl).hostname;
+    const externalId = `gitea_${host}_${giteaUser.id}`;
+    const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
+    let user = existing.data[0];
+    if (!user) {
+      const params: Record<string, unknown> = {
+        externalId,
+        username: `gitea_${giteaUser.login}`.slice(0, 64),
+        skipPasswordRequirement: true,
+        publicMetadata: { gitea_login: giteaUser.login, gitea_url: giteaUrl },
+      };
+      if (giteaUser.full_name) {
+        const parts = giteaUser.full_name.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (giteaUser.email) params.emailAddress = [giteaUser.email];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
+    }
+    const { token: ticket } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
+    res.json({ ticket, username: giteaUser.login });
+  } catch (err: any) {
+    console.error("Gitea token verify error:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to verify token: " + (err?.message ?? "unknown error") });
+  }
+});
+
+// GET /api/auth/gitea  — start OAuth flow (for pre-configured single-instance deployments)
 router.get("/gitea", (req, res) => {
   const giteaUrl = process.env.GITEA_URL?.replace(/\/$/, "");
   const clientId = process.env.GITEA_CLIENT_ID;
