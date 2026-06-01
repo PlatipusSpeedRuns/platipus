@@ -218,92 +218,169 @@ router.post("/sourcehut/token", async (req, res) => {
   }
 });
 
-// ── YouTube OAuth (Google OAuth with YouTube scope) ────────────────────────────
+// ── Twitch OAuth ──────────────────────────────────────────────────────────────
 
-router.get("/youtube", (req, res) => {
-  const clientId = process.env.YOUTUBE_CLIENT_ID;
+router.get("/twitch", (req, res) => {
+  const clientId = process.env.TWITCH_CLIENT_ID;
   if (!clientId) {
-    return void res.status(503).send("YouTube OAuth not configured. Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET.");
+    return void res.status(503).send("Twitch OAuth not configured. Set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET.");
   }
-  const redirectUri = `${getBase(req)}/api/auth/youtube/callback`;
+  const redirectUri = `${getBase(req)}/api/auth/twitch/callback`;
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/youtube.readonly",
-    access_type: "offline",
-    prompt: "select_account",
+    scope: "user:read:email",
   });
-  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  res.redirect(`https://id.twitch.tv/oauth2/authorize?${params}`);
 });
 
-router.get("/youtube/callback", async (req, res) => {
+router.get("/twitch/callback", async (req, res) => {
   const { code } = req.query as { code?: string };
   const base = getBase(req);
-  if (!code) return void res.redirect(`${base}/?auth_error=youtube_cancelled`);
+  if (!code) return void res.redirect(`${base}/?auth_error=twitch_cancelled`);
 
-  const clientId = process.env.YOUTUBE_CLIENT_ID ?? "";
-  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET ?? "";
-  const redirectUri = `${base}/api/auth/youtube/callback`;
+  const clientId = process.env.TWITCH_CLIENT_ID ?? "";
+  const clientSecret = process.env.TWITCH_CLIENT_SECRET ?? "";
+  const redirectUri = `${base}/api/auth/twitch/callback`;
 
   try {
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    const tokenRes = await fetch("https://id.twitch.tv/oauth2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        code,
         client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: redirectUri,
+        code,
         grant_type: "authorization_code",
+        redirect_uri: redirectUri,
       }),
     });
-    const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string };
-    if (!tokenData.access_token) {
-      console.error("YouTube token error:", tokenData.error);
-      return void res.redirect(`${base}/?auth_error=youtube_token_failed`);
-    }
+    const tokenData = (await tokenRes.json()) as { access_token?: string };
+    if (!tokenData.access_token) return void res.redirect(`${base}/?auth_error=twitch_token_failed`);
 
-    const channelRes = await fetch(
-      "https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true",
-      { headers: { Authorization: `Bearer ${tokenData.access_token}` } },
-    );
-    const channelData = (await channelRes.json()) as {
-      items?: { id: string; snippet: { title: string } }[];
+    const userRes = await fetch("https://api.twitch.tv/helix/users", {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        "Client-Id": clientId,
+      },
+    });
+    const userData = (await userRes.json()) as {
+      data?: { id: string; login: string; display_name: string; email?: string }[];
     };
+    const twUser = userData.data?.[0];
+    if (!twUser) return void res.redirect(`${base}/?auth_error=twitch_user_failed`);
 
-    const channel = channelData.items?.[0];
-    if (!channel) {
-      return void res.redirect(`${base}/?auth_error=youtube_no_channel`);
-    }
-
-    const channelId = channel.id;
-    const channelTitle = channel.snippet.title;
-    const externalId = `youtube_${channelId}`;
-
+    const externalId = `twitch_${twUser.id}`;
     const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
     let user = existing.data[0];
     if (!user) {
-      const safeName = channelTitle.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 50);
-      user = await clerkClient().users.createUser({
+      const params: Record<string, unknown> = {
         externalId,
-        username: `yt_${safeName}`.slice(0, 64),
-        firstName: channelTitle,
+        username: `tw_${twUser.login}`.slice(0, 64),
         skipPasswordRequirement: true,
-        publicMetadata: { youtube_channel_id: channelId, youtube_channel_title: channelTitle },
-      } as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0]);
+        publicMetadata: { twitch_login: twUser.login, twitch_display_name: twUser.display_name },
+      };
+      if (twUser.display_name) {
+        const parts = twUser.display_name.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (twUser.email) params.emailAddress = [twUser.email];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
     }
-
     const { token } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
     res.redirect(
-      `${base}/auth/callback` +
-        `?ticket=${encodeURIComponent(token)}` +
-        `&provider=youtube` +
-        `&username=${encodeURIComponent(channelTitle)}`,
+      `${base}/auth/callback?ticket=${encodeURIComponent(token)}&provider=twitch&username=${encodeURIComponent(twUser.login)}`,
     );
   } catch (err: any) {
-    console.error("YouTube callback error:", err?.message ?? err);
-    res.redirect(`${base}/?auth_error=youtube_error`);
+    console.error("Twitch callback error:", err?.message ?? err);
+    res.redirect(`${base}/?auth_error=twitch_error`);
+  }
+});
+
+// ── Discord OAuth ─────────────────────────────────────────────────────────────
+
+router.get("/discord", (req, res) => {
+  const clientId = process.env.DISCORD_CLIENT_ID;
+  if (!clientId) {
+    return void res.status(503).send("Discord OAuth not configured. Set DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET.");
+  }
+  const redirectUri = `${getBase(req)}/api/auth/discord/callback`;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "identify email",
+  });
+  res.redirect(`https://discord.com/api/oauth2/authorize?${params}`);
+});
+
+router.get("/discord/callback", async (req, res) => {
+  const { code } = req.query as { code?: string };
+  const base = getBase(req);
+  if (!code) return void res.redirect(`${base}/?auth_error=discord_cancelled`);
+
+  const clientId = process.env.DISCORD_CLIENT_ID ?? "";
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET ?? "";
+  const redirectUri = `${base}/api/auth/discord/callback`;
+
+  try {
+    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      }),
+    });
+    const tokenData = (await tokenRes.json()) as { access_token?: string };
+    if (!tokenData.access_token) return void res.redirect(`${base}/?auth_error=discord_token_failed`);
+
+    const userRes = await fetch("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const dcUser = (await userRes.json()) as {
+      id: string;
+      username: string;
+      global_name?: string;
+      email?: string;
+    };
+    if (!dcUser.id) return void res.redirect(`${base}/?auth_error=discord_user_failed`);
+
+    const externalId = `discord_${dcUser.id}`;
+    const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
+    let user = existing.data[0];
+    if (!user) {
+      const displayName = dcUser.global_name ?? dcUser.username;
+      const params: Record<string, unknown> = {
+        externalId,
+        username: `dc_${dcUser.username}`.slice(0, 64),
+        skipPasswordRequirement: true,
+        publicMetadata: { discord_username: dcUser.username, discord_id: dcUser.id },
+      };
+      if (displayName) {
+        const parts = displayName.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (dcUser.email) params.emailAddress = [dcUser.email];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
+    }
+    const { token } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
+    res.redirect(
+      `${base}/auth/callback?ticket=${encodeURIComponent(token)}&provider=discord&username=${encodeURIComponent(dcUser.username)}`,
+    );
+  } catch (err: any) {
+    console.error("Discord callback error:", err?.message ?? err);
+    res.redirect(`${base}/?auth_error=discord_error`);
   }
 });
 
