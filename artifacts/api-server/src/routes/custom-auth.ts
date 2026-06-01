@@ -258,6 +258,54 @@ router.get("/gitea/callback", async (req, res) => {
   }
 });
 
+// ── Forgejo token auth (same Gitea API, any Forgejo instance) ────────────────
+
+router.post("/forgejo/token", async (req, res) => {
+  const { forgejoUrl: rawUrl, token } = req.body as { forgejoUrl?: string; token?: string };
+  if (!rawUrl || !token) {
+    return void res.status(400).json({ error: "forgejoUrl and token are required" });
+  }
+  const forgejoUrl = rawUrl.replace(/\/$/, "");
+
+  try {
+    const userRes = await fetch(`${forgejoUrl}/api/v1/user`, {
+      headers: { Authorization: `token ${token}` },
+    });
+    if (!userRes.ok) {
+      return void res.status(401).json({ error: "Invalid token or unreachable Forgejo instance" });
+    }
+    const fjUser = (await userRes.json()) as { id: number; login: string; email?: string; full_name?: string };
+    if (!fjUser.login) return void res.status(401).json({ error: "Could not read user from Forgejo" });
+
+    const host = new URL(forgejoUrl).hostname;
+    const externalId = `forgejo_${host}_${fjUser.id}`;
+    const existing = await clerkClient().users.getUserList({ externalId: [externalId] });
+    let user = existing.data[0];
+    if (!user) {
+      const params: Record<string, unknown> = {
+        externalId,
+        username: `forgejo_${fjUser.login}`.slice(0, 64),
+        skipPasswordRequirement: true,
+        publicMetadata: { forgejo_login: fjUser.login, forgejo_url: forgejoUrl },
+      };
+      if (fjUser.full_name) {
+        const parts = fjUser.full_name.trim().split(/\s+/);
+        params.firstName = parts[0];
+        if (parts.length > 1) params.lastName = parts.slice(1).join(" ");
+      }
+      if (fjUser.email) params.emailAddress = [fjUser.email];
+      user = await clerkClient().users.createUser(
+        params as Parameters<ReturnType<typeof clerkClient>["users"]["createUser"]>[0],
+      );
+    }
+    const { token: ticket } = await clerkClient().signInTokens.createSignInToken({ userId: user.id, expiresInSeconds: 300 });
+    res.json({ ticket, username: fjUser.login });
+  } catch (err: any) {
+    console.error("Forgejo token verify error:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to verify token: " + (err?.message ?? "unknown error") });
+  }
+});
+
 // ── Codeberg OAuth (Gitea instance at codeberg.org) ──────────────────────────
 
 const CODEBERG_URL = "https://codeberg.org";
